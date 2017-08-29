@@ -1,0 +1,4 @@
+---
+- hosts: '{{host}}'
+  roles:
+    - logtrust.go-audit

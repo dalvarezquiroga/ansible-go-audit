@@ -1,0 +1,4 @@
+---
+# vars file for logtrust.go-audit
+rsyslog_server: "YOUR-RSYSLOG-SERVER"
+rsyslog_port: "YOUR-RSYSLOG-PORT"

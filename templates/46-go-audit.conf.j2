@@ -1,0 +1,12 @@
+# Box audit template
+#
+template(
+  name="boxaudit"
+  type="string"
+  string="<%PRI%>%timegenerated% %HOSTNAME% box.audit.unix.%syslogtag%%msg%"
+)
+
+if $syslogtag startswith "go-audit" then {
+  @@{{rsyslog_server}}:{{rsyslog_port}};boxaudit
+  stop
+}

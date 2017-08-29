@@ -1,0 +1,120 @@
+---
+# tasks file for logtrust.go-audit
+
+###### Install Repository & package Golang Ubuntu 16.04 #######
+- name: Add Repository Golang
+  apt_repository:
+      repo: 'ppa:longsleep/golang-backports'
+      update_cache: yes
+      state: present
+      validate_certs: yes
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '16.04'
+
+- name: Install neccesary package
+  apt: name={{ item }} state=installed
+  with_items:
+    - golang-go
+    - git
+    - make
+    - auditd
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '16.04'
+
+### Install Repository & package Golang Ubuntu 14.04 #####
+- name: Add Repository Golang
+  apt_repository:
+      repo: 'ppa:gophers/archive'
+      update_cache: yes
+      state: present
+      validate_certs: yes
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04'
+
+- name: Install neccesary package
+  apt: name={{ item }} state=installed
+  with_items:
+    - golang-1.8
+    - git
+    - make
+    - auditd
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04'
+
+####### Ensure link ########
+- name: Ensure link go
+  file:
+    src: '/usr/lib/go-1.8/bin/{{ item.src }}'
+    dest: '{{ item.dest }}'
+    state: link
+  with_items:
+    - { src: 'go', dest: '/usr/bin/go' }
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04'
+
+####### Registry Go Version #########
+- name: Register the current Go version
+  command: go version
+  ignore_errors: yes
+  register: go_version
+
+###### Install Govendor && go-audit ########
+- name: Install dependency Govendor && Go-audit
+  shell: go get -u github.com/kardianos/govendor && go get -u github.com/slackhq/go-audit
+  args:
+    chdir: /root/
+    executable: /bin/bash
+
+######## Create symbolic link in machine for Govendor && go-audit ########     
+- file:
+    src: '/root/go/bin/{{ item.src }}'
+    dest: '{{ item.dest }}'
+    state: link
+  with_items:
+    - { src: 'govendor', dest: '/usr/bin/govendor' }
+    - { src: 'go-audit', dest: '/usr/bin/go-audit' }
+
+######## Create files ########
+- name: Create a directory if it doesn't exist
+  file: path=/etc/go-audit.d/ state=directory owner=root  group=logtrust   mode=0755
+
+####### System.d vs Init.d && Ubuntu 14.04 vs Ubuntu 16.04 #######
+- name: Copy init.d script go-audit
+  copy: src=init_go-audit_ubuntu14 dest=/etc/init.d/go-audit owner=root group=root mode=0755
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04'
+
+- name: Copy system.d script 
+  copy: src=go-audit.service dest=/etc/systemd/system/go-audit.service owner=root group=root mode=0644
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '16.04'
+
+######### Copy go-audit.yaml ########## 
+- name: Copy Systemd go-audit unit file /etc/go-audit.d/
+  template: src=go-audit.conf.j2  dest=/etc/go-audit.d/go-audit.yaml  owner=root  group=logtrust mode=0755
+
+######## Rsyslog config and service #####
+- name: Copy rsyslog template
+  template: src=46-go-audit.conf.j2 dest=/etc/rsyslog.d/46-go-audit.conf owner=root  group=root mode=0644
+
+- name: Restart rsyslog
+  service: name=rsyslog state=restarted
+
+######## Stop auditd standard Linux #####
+- name: Stop auditd Ubuntu 14.04
+  service: name=auditd  state=stopped
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04'
+
+- name: Stop audit Ubuntu 16.04
+  systemd:
+    state: stopped
+    daemon_reload: yes
+    name: auditd
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '16.04'
+
+######## Start Go-Audit ######
+- name: Start go-audit
+  service: name=go-audit state=restarted  enabled=yes
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '14.04' 
+
+- name: Start go-audit
+  systemd: 
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    name: go-audit.service
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_version == '16.04'
+

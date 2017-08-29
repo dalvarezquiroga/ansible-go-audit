@@ -1,0 +1,25 @@
+# /etc/go-audit.yaml
+
+canary: true
+
+output:
+  syslog:
+    attempts: 15
+    enabled: true
+    #network: unixgram
+    address: /var/log/go-audit.log
+    priority: 132
+    tag: go-audit
+
+# log an event when we believe a message has been lost
+message_tracking:
+  enabled: true
+  log_out_of_order: false
+  max_out_of_order: 500
+
+rules:
+  - -b 1024
+  # required if you set canary: true
+  - -w /proc/net/netlink -p war -k netlink-file
+  - -a exit,always -F arch=b64 -S execve -k execve
+  - -a exit,always -F arch=b32 -S execve -k execve
